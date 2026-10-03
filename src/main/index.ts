@@ -35,6 +35,7 @@ import { adoptShellPath } from "./proc";
 import { hint, Store, type SecretName } from "./store";
 import { DirectTransport, RelayTransport, type Transport } from "./transport";
 import { Worker } from "./worker";
+import { watchForUpdates } from "./updates";
 
 const argv = process.argv.slice(1);
 const flag = (name: string): string | null => {
@@ -534,6 +535,7 @@ void app.whenReady().then(async () => {
     updateTray(state());
     worker.start();
     setInterval(() => void redetect(), 10 * 60_000);
+    watchForUpdates();
   }
 });
 

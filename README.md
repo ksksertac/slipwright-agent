@@ -5,9 +5,31 @@ Paired once with a connection code, it takes phases to **write** with the person
 model -- Claude Code or Codex as installed and signed in, or an Anthropic / OpenAI API key --
 and **builds** iOS and Android when the machine can (Xcode, Android SDK + JDK).
 
-It speaks the worker protocol itself, in TypeScript ([docs/machines-protocol.md](../docs/machines-protocol.md)):
-plain HTTP to a server on the same network, or sealed end to end through the relay from
-anywhere. Nothing of Slipwright's Python is needed on the machine.
+**Download:** [the latest release](https://github.com/ksksertac/slipwright-agent/releases/latest)
+-- `Slipwright-Agent-Setup.exe` (Windows), `Slipwright-Agent-mac-arm64.dmg` /
+`Slipwright-Agent-mac-x64.dmg` (Mac), `Slipwright-Agent.AppImage` or `slipwright-agent.deb`
+(Linux), and `slipwright-agent.cjs` for a server with no window (*On a server*, below).
+The connection code comes from Slipwright: **Settings → Machines → Connect a machine**.
+
+It speaks the worker protocol itself, in TypeScript -- plain HTTP to a server on the same
+network, or sealed end to end through the relay from anywhere. Nothing of Slipwright's
+Python is needed on the machine. The protocol is written down once, in the server's
+repository: [docs/machines-protocol.md](https://github.com/ksksertac/slipwright/blob/main/docs/machines-protocol.md).
+
+## Its own releases, and the server's
+
+This app is released apart from [Slipwright](https://github.com/ksksertac/slipwright):
+every merge to `main` here is the next patch (`v1.0.3` → `v1.0.4`), built for every
+platform by CI and published as a GitHub release. A running app updates itself from those
+releases (Windows and the AppImage; a Mac is told, since an unsigned app cannot replace
+itself there), and `slipwright-agent` on a server says when a newer one is out.
+
+What the two must agree on is the worker protocol. The app sends its number with every
+request (`x-slipwright-protocol`, `src/main/protocol.ts`); a server that no longer speaks it
+answers 426 and the app says to update instead of failing in some way nobody can read.
+Changing the protocol means a change here and one in the server, and the test vectors in
+`test/crypto.test.ts` are the server's own (`tests/test_phase17_relay.py`) -- both sides
+must keep passing them.
 
 ## How it is put together
 
@@ -30,7 +52,6 @@ as JSON.
 ## Running it
 
 ```bash
-cd desktop
 npm install
 npm run dev          # the app with hot reload
 npm test             # vitest: codes, crypto vectors, parts, relay, worker loop, parsing
@@ -76,10 +97,10 @@ itself: the macOS build in particular needs a Mac.
 
 ## Downloads
 
-Every release of Slipwright carries the app, built by CI on each platform
-(`.github/workflows/docker.yml`, the `desktop` jobs), under names that never change, so
-`https://github.com/ksksertac/slipwright/releases/latest/download/<name>` is always the
-newest:
+Every release carries the app, built by CI on each platform (`.github/workflows/ci.yml`),
+under names that never change, so
+`https://github.com/ksksertac/slipwright-agent/releases/latest/download/<name>` is always
+the newest:
 
 | | |
 |---|---|

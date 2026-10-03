@@ -1,0 +1,151 @@
+# Checks every push, and on main releases the app for every platform.
+#
+#   pull request  -> checked and built on Windows, macOS and Linux; nothing is published
+#   main          -> a *release*: the newest v1.2.3 tag's next patch, v1.2.4 (the first is
+#                    v1.0.0), carrying every package, slipwright-agent.cjs for servers and
+#                    the latest*.yml a running app updates itself from
+#   tag v1.3.0    -> the same, for a bigger step taken by hand; patches count on from it
+#
+# Released apart from the server (ksksertac/slipwright): the app only changes when it
+# changes. What the two must agree on is the worker protocol, whose number the app sends
+# with every request (src/main/protocol.ts); a server that no longer speaks it says so.
+#
+# The file names never change (electron-builder.yml), so
+# https://github.com/ksksertac/slipwright-agent/releases/latest/download/<name> is always
+# the newest -- the server's Machines page links to them that way.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build:cli
+
+  # What this run is released as: nothing for a pull request; a pushed tag's own number;
+  # on main the commit's tag if somebody already gave it one, else the next patch.
+  version:
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: next
+        run: |
+          release='^v[0-9]+\.[0-9]+\.[0-9]+$'
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="$GITHUB_REF_NAME"
+            [[ "$tag" =~ $release ]] || { echo "not a release tag: $tag"; exit 0; }
+          else
+            tag=$(git tag --points-at HEAD | grep -E "$release" | sort -V | tail -1 || true)
+            if [ -z "$tag" ]; then
+              newest=$(git tag -l 'v*' | grep -E "$release" | sort -V | tail -1 || true)
+              if [ -z "$newest" ]; then
+                tag="v1.0.0"
+              else
+                IFS=. read -r major minor patch <<< "${newest#v}"
+                tag="v${major}.${minor}.$(( patch + 1 ))"
+              fi
+            fi
+          fi
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "releasing ${tag#v}"
+
+  build:
+    needs: [test, version]
+    if: ${{ !cancelled() && needs.test.result == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win
+          # both chips: a dmg for Apple Silicon and one for an Intel Mac
+          - os: macos-latest
+            target: --mac --arm64 --x64
+          - os: ubuntu-latest
+            target: --linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # the release's number, so the app and slipwright-agent say which they are
+      - if: needs.version.outputs.version != ''
+        run: npm version "${{ needs.version.outputs.version }}" --no-git-tag-version --allow-same-version
+      - run: npm run build
+      # unsigned for now (README, Signing), and never published from here: the release job
+      # decides what a release carries
+      - run: npx electron-builder ${{ matrix.target }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - if: runner.os == 'Linux'
+        run: npm run build:cli && cp out/cli/slipwright-agent.cjs dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ runner.os }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.cjs
+            dist/*.blockmap
+            dist/latest*.yml
+
+  # Every platform or none: a running app reads latest*.yml to update itself, and a release
+  # missing one platform's would leave that platform's apps looking for files not there.
+  release:
+    needs: [version, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.version.outputs.version != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: app-*
+          merge-multiple: true
+          path: dist
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ needs.version.outputs.version }}
+        run: |
+          ls -la dist
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Slipwright Agent $TAG" --generate-notes --latest
+          fi

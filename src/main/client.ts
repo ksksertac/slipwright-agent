@@ -2,6 +2,7 @@
 // chose, and pairing itself. Nothing here knows whether the bytes go over a LAN or
 // through the relay.
 
+import { UPGRADE_REQUIRED } from "./protocol";
 import { unpack } from "./code";
 import * as box from "./crypto";
 import { candidates } from "./lan";
@@ -112,6 +113,8 @@ export class WorkerClient {
   private async call(method: string, path: string, body?: unknown, timeoutMs?: number): Promise<Reply> {
     const reply = await this.transport.request(method, `/api/worker${path}`, body, { token: this.token, timeoutMs });
     if (reply.status === 401) throw new Unpaired("the server does not know this machine any more; pair it again");
+    // not the pairing's fault: kept, and asked again until somebody updates the app
+    if (reply.status === UPGRADE_REQUIRED) throw new TransportError(`update Slipwright Agent: ${detail(reply)}`);
     return reply;
   }
 

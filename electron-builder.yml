@@ -5,6 +5,12 @@
 # always fetch the newest one -- the Machines page links to them that way.
 appId: app.slipwright.agent
 productName: Slipwright Agent
+# where a running app looks for a newer one (src/main/updates.ts); CI uploads latest*.yml
+publish:
+  provider: github
+  owner: ksksertac
+  repo: slipwright-agent
+  releaseType: release
 directories:
   buildResources: build
   output: dist

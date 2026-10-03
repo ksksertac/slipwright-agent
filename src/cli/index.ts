@@ -32,6 +32,7 @@ const VERSION = typeof __VERSION__ === "string" ? __VERSION__ : "dev";
 const STATE_FILE = "slipwright-agent.state.json";
 const HISTORY_FILE = "slipwright-agent.history.json";
 const RELOAD_MS = 5_000;
+const RELEASES = "https://github.com/ksksertac/slipwright-agent/releases/latest";
 
 // -- saying things ------------------------------------------------------------------------
 
@@ -294,8 +295,29 @@ async function run(p: Paths): Promise<void> {
 
   const caps = capabilitiesOf(settings, found);
   say(`slipwright-agent ${VERSION} as "${name()}"; asking for: ${caps.length ? caps.join(", ") : "nothing yet"}`);
+  void newer().then((tag) => tag && say(`a newer slipwright-agent is out: ${tag} -- ${RELEASES}`));
   if (!caps.length) say("warning: no agent has a model this machine can run -- run: slipwright-agent check");
   worker.start();
+}
+
+/** The newest release's tag when it is newer than this one; a server is never updated
+ *  behind its owner's back, only told. Silent when GitHub cannot be reached. */
+async function newer(): Promise<string | null> {
+  if (VERSION === "dev") return null;
+  try {
+    const r = await fetch("https://api.github.com/repos/ksksertac/slipwright-agent/releases/latest", {
+      headers: { accept: "application/vnd.github+json", "user-agent": "slipwright-agent" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) return null;
+    const tag = String(((await r.json()) as { tag_name?: string }).tag_name ?? "");
+    const parts = (v: string) => v.replace(/^v/, "").split(".").map((n) => Number(n) || 0);
+    const [a, b] = [parts(tag), parts(VERSION)];
+    for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0) ? tag : null;
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 // -- the door ---------------------------------------------------------------------------

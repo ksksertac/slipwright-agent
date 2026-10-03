@@ -5,6 +5,7 @@
 // to the server's key and every answer sealed back (docs/machines-protocol.md §3). The
 // worker loop above neither knows nor cares which -- that is the point of the interface.
 
+import { PROTOCOL, PROTOCOL_HEADER } from "./protocol";
 import { randomBytes } from "node:crypto";
 import WebSocket from "ws";
 import * as box from "./crypto";
@@ -65,7 +66,7 @@ export class DirectTransport implements Transport {
 
   async request(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<Reply> {
     const { bytes, type } = encode(body);
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { [PROTOCOL_HEADER]: String(PROTOCOL) };
     if (type) headers["content-type"] = type;
     if (options.token) headers.authorization = `Bearer ${options.token}`;
     let response: Response;
@@ -163,7 +164,7 @@ export class RelayTransport implements Transport {
     if (!server) throw new TransportError("no server key: pair through the relay first");
     this.key ??= box.boxKey(this.keys.client.secret, server, this.keys.client.public, server);
     const { bytes, type } = encode(body);
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { [PROTOCOL_HEADER]: String(PROTOCOL) };
     if (type) headers["content-type"] = type;
     if (options.token) headers.authorization = `Bearer ${options.token}`;
     const id = randomBytes(8).toString("hex");

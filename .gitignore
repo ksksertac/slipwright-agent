@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+*.tsbuildinfo
+.vite/
+# the scratch of a local run of slipwright-agent
+settings.json
+slipwright-agent.state.json
+slipwright-agent.history.json
+work/
