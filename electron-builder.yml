@@ -25,8 +25,13 @@ mac:
   category: public.app-category.developer-tools
   target: [dmg, zip]
   artifactName: Slipwright-Agent-mac-${arch}.${ext}
-  hardenedRuntime: true
-  # notarization needs an Apple Developer account; see README
+  # Ad-hoc signed ("-"): no Developer ID, but one signature over the whole bundle. Left
+  # unsigned, electron-builder's changes to the bundle broke the signature Electron ships
+  # with, and Gatekeeper called a downloaded copy "damaged" rather than "unidentified
+  # developer". Hardened runtime is off because an ad-hoc signature has no team for its
+  # library validation to match. A Developer ID and notarization replace both (README).
+  identity: "-"
+  hardenedRuntime: false
   notarize: false
 win:
   target: [nsis]

@@ -8,25 +8,33 @@
 // Slipwright's own page does: the version is in the corner, a newer one opens a dialog,
 // one press downloads it and another restarts into it.
 //
-// Not on a Mac or from a .deb: an app that is not signed and notarized cannot replace
-// itself on a Mac (README, Signing), and a .deb belongs to its package manager. There the
-// same dialog offers the release page instead -- told, and one click from it.
+// On a Mac the updater's own way (Squirrel.Mac) needs a Developer ID this app does not have,
+// so it downloads and swaps the bundle itself (macupdate.ts) -- which also keeps the copy
+// free of the quarantine flag that made Gatekeeper call every browser-downloaded version
+// "damaged". A .deb belongs to its package manager, and a Mac copy run from the .dmg or a
+// folder it cannot write to cannot replace itself: those are offered the release page.
 
 import { app, shell } from "electron";
 import { autoUpdater, type UpdateInfo } from "electron-updater";
 import type { UpdateView } from "@shared/types";
+import { canReplaceItself, fetchBundle, runningBundle, swapAndRelaunch, zipName } from "./macupdate";
 
 const EVERY_MS = 6 * 60 * 60_000;
 const RELEASES = "https://github.com/ksksertac/slipwright-agent/releases/latest";
 const LATEST = "https://api.github.com/repos/ksksertac/slipwright-agent/releases/latest";
 
-/** Whether this copy can put a newer one in its own place. */
-function selfUpdating(): boolean {
-  if (process.platform === "darwin") return false;
-  return process.platform !== "linux" || !!process.env.APPIMAGE;
+/** How this copy is updated: by electron-updater, by swapping its own Mac bundle, or by a
+ *  person from the release page. */
+function howUpdated(): "updater" | "mac" | "page" {
+  if (process.platform === "darwin") return app.isPackaged && canReplaceItself() ? "mac" : "page";
+  return process.platform !== "linux" || process.env.APPIMAGE ? "updater" : "page";
 }
 
-let view: UpdateView = { phase: "none", version: null, notes: null, percent: 0, error: null, self: selfUpdating() };
+const how = howUpdated();
+let view: UpdateView = { phase: "none", version: null, notes: null, percent: 0, error: null, self: how !== "page" };
+// the Mac's: where the newer zip is, and the unpacked bundle waiting for the restart
+let macZip: string | null = null;
+let macFresh: string | null = null;
 let changed: () => void = () => {};
 
 function set(patch: Partial<UpdateView>): void {
@@ -71,8 +79,9 @@ async function lookAtThePage(): Promise<void> {
     signal: AbortSignal.timeout(10_000),
   });
   if (!r.ok) return;
-  const release = (await r.json()) as { tag_name?: string; body?: string };
+  const release = (await r.json()) as { tag_name?: string; body?: string; assets?: { name?: string; browser_download_url?: string }[] };
   const tag = String(release.tag_name ?? "");
+  macZip = release.assets?.find((a) => a.name === zipName())?.browser_download_url ?? null;
   if (tag && isNewer(tag, app.getVersion())) set({ phase: "available", version: tag.replace(/^v/, ""), notes: plainNotes(release.body) });
 }
 
@@ -81,7 +90,7 @@ export async function checkForUpdates(): Promise<void> {
   // a download under way, or one waiting for its restart, is not asked about again
   if (view.phase === "downloading" || view.phase === "ready") return;
   try {
-    if (view.self) await autoUpdater.checkForUpdates();
+    if (how === "updater") await autoUpdater.checkForUpdates();
     else await lookAtThePage();
   } catch {
     // offline, or GitHub unreachable: the next look is in six hours, or a press away
@@ -89,14 +98,21 @@ export async function checkForUpdates(): Promise<void> {
 }
 
 export async function downloadUpdate(): Promise<void> {
-  if (!view.self) {
+  // a Mac release without its zip (an older one, or a build that failed half-way) is
+  // still one a person can install from the page
+  if (how === "page" || (how === "mac" && !macZip)) {
     void shell.openExternal(RELEASES);
     return;
   }
   if (view.phase !== "available" && view.phase !== "error") return;
   set({ phase: "downloading", percent: 0, error: null });
   try {
-    await autoUpdater.downloadUpdate();
+    if (how === "mac") {
+      macFresh = await fetchBundle(macZip!, (percent) => set({ phase: "downloading", percent }));
+      set({ phase: "ready", percent: 100 });
+    } else {
+      await autoUpdater.downloadUpdate();
+    }
   } catch (e) {
     set({ phase: "error", error: e instanceof Error ? e.message : String(e) });
   }
@@ -106,6 +122,13 @@ export async function downloadUpdate(): Promise<void> {
  *  caller marks the app as quitting first, or the installer would wait on a hidden window. */
 export function installUpdate(): boolean {
   if (view.phase !== "ready") return false;
+  if (how === "mac") {
+    const bundle = runningBundle();
+    if (!macFresh || !bundle) return false;
+    swapAndRelaunch(macFresh, bundle);
+    app.quit();
+    return true;
+  }
   // isSilent false: the installer shows its progress, so a person is not left looking at
   // nothing for the seconds it takes; forceRunAfter: the app comes back on its own
   autoUpdater.quitAndInstall(false, true);
@@ -115,7 +138,7 @@ export function installUpdate(): boolean {
 export function watchForUpdates(onChange: () => void): void {
   changed = onChange;
   if (!app.isPackaged) return;
-  if (view.self) {
+  if (how === "updater") {
     // asked first: the download is the person's press, and so is the restart
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
