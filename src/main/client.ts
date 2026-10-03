@@ -2,6 +2,7 @@
 // chose, and pairing itself. Nothing here knows whether the bytes go over a LAN or
 // through the relay.
 
+import type { MachineAbout } from "./about";
 import { UPGRADE_REQUIRED } from "./protocol";
 import { unpack } from "./code";
 import * as box from "./crypto";
@@ -125,6 +126,12 @@ export class WorkerClient {
     const task = json<Task & { kind?: string }>(got);
     // a server from before Phase 17 sends builds without `kind`
     return { ...task, kind: task.kind === "write" ? "write" : "build" } as Task;
+  }
+
+  /** What this machine is (protocol 2). False from a server too old to ask: it answers 404,
+   *  and nothing else changes. */
+  async about(body: MachineAbout): Promise<boolean> {
+    return (await this.call("POST", "/about", body)).status === 204;
   }
 
   async heartbeat(): Promise<void> {

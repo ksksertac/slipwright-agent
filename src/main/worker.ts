@@ -12,6 +12,7 @@ import { join } from "node:path";
 import type { AgentId, HistoryEntry, LogLine, ResolvedChoice, TaskView } from "@shared/types";
 import { VENDORS, type KeyVendor } from "@shared/vendors";
 import { runBuild } from "./build";
+import type { MachineAbout } from "./about";
 import { agentFor } from "./capabilities";
 import { Unpaired, WorkerClient, type Build, type Call, type Task } from "./client";
 import { callAnthropic, callCompat } from "./models/api";
@@ -42,6 +43,8 @@ export interface WorkerHost {
   rememberJiraAccount(account: string): void;
   toolchainEnv(): Record<string, string>;
   recordHistory(entry: HistoryEntry): void;
+  /** What this machine is, for its card on the server (protocol 2); left out, it never says. */
+  about?(): Promise<MachineAbout>;
   connected(ok: boolean, error?: string): void;
   unpaired(why: string): void;
   done(entry: HistoryEntry): void;
@@ -64,6 +67,9 @@ export class Worker extends EventEmitter {
   private wake: (() => void) | null = null;
   private loop: Promise<void> | null = null;
   private handling = new Set<Promise<void>>();
+  // what was last said about this machine, and to which connection: said again only when
+  // it changes (an agent switched on, another model) or the pairing does
+  private told: { client: WorkerClient; what: string } | null = null;
 
   constructor(private readonly host: WorkerHost) {
     super();
@@ -115,6 +121,7 @@ export class Worker extends EventEmitter {
         await this.sleep(client ? 3000 : 5000);
         continue;
       }
+      void this.tell(client);
       try {
         const task = await client.poll(capabilities, this.host.name());
         this.host.connected(true);
@@ -133,6 +140,22 @@ export class Worker extends EventEmitter {
         await this.sleep(pause);
         pause = Math.min(pause * 2, 60_000);
       }
+    }
+  }
+
+  /** Says what this machine is, once per connection and again when it changes. Never in
+   *  the poll's way: a server that does not answer it only means the card says less. */
+  private async tell(client: WorkerClient): Promise<void> {
+    if (!this.host.about) return;
+    try {
+      const about = await this.host.about();
+      const what = JSON.stringify(about);
+      if (this.told?.client === client && this.told.what === what) return;
+      this.told = { client, what };
+      // a 404 is an older server: told, and not asked again until something changes
+      await client.about(about);
+    } catch {
+      this.told = null; // offline, or a refusal: try again on the next round
     }
   }
 

@@ -27,6 +27,7 @@ import { PROVIDER_IDS, resolveChoice } from "@shared/resolve";
 import { isKeyVendor, KEY_VENDORS, type KeyVendor } from "@shared/vendors";
 import { acceptEvrenTerms, evrenTerms, listModels } from "./models/catalog";
 import { fromApp } from "../cli/settings";
+import { machineAbout } from "./about";
 import { capabilities as deriveCapabilities, type Keys } from "./capabilities";
 import { pair, Unpaired, WorkerClient } from "./client";
 import { CodeError } from "./code";
@@ -540,6 +541,7 @@ void app.whenReady().then(async () => {
     maxConcurrent: () => store.settings.maxConcurrent,
     workDir: () => store.settings.workDir,
     model: (agent) => resolveChoice(store.settings, agent),
+    about: () => machineAbout(capabilities(), (agent) => resolveChoice(store.settings, agent)),
     secret: (name) => store.secret(name),
     bitbucketUser: () => store.settings.bitbucket.user,
     jira: () => store.settings.jira,
