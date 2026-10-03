@@ -1,3 +1,23 @@
+<p align="center">
+  <img src="docs/hero.png" alt="Slipwright Agent: lend a computer to Slipwright" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/ksksertac/slipwright-agent/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/ksksertac/slipwright-agent?style=for-the-badge&color=3987e5&label=release"></a>
+  <a href="https://github.com/ksksertac/slipwright-agent/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ksksertac/slipwright-agent/ci.yml?branch=main&style=for-the-badge&label=ci"></a>
+  <img alt="macOS, Windows, Linux" src="https://img.shields.io/badge/macOS%20·%20Windows%20·%20Linux-1d2129?style=for-the-badge">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/ksksertac/slipwright-agent?style=for-the-badge&color=1d2129"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/ksksertac/slipwright-agent/releases/latest/download/Slipwright-Agent-mac-arm64.dmg"><b>macOS · Apple Silicon</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/ksksertac/slipwright-agent/releases/latest/download/Slipwright-Agent-mac-x64.dmg"><b>macOS · Intel</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/ksksertac/slipwright-agent/releases/latest/download/Slipwright-Agent-Setup.exe"><b>Windows</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/ksksertac/slipwright-agent/releases/latest/download/Slipwright-Agent.AppImage"><b>Linux AppImage</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/ksksertac/slipwright-agent/releases/latest/download/slipwright-agent.deb"><b>.deb</b></a> &nbsp;·&nbsp;
+  <a href="#on-a-server-slipwright-agent"><b>Headless server</b></a>
+</p>
+
 # Slipwright Agent
 
 A desktop app (macOS, Windows, Linux) that lends this computer to a Slipwright account.
@@ -5,11 +25,56 @@ Paired once with a connection code, it takes phases to **write** with the person
 model -- Claude Code or Codex as installed and signed in, or an Anthropic / OpenAI API key --
 and **builds** iOS and Android when the machine can (Xcode, Android SDK + JDK).
 
-**Download:** [the latest release](https://github.com/ksksertac/slipwright-agent/releases/latest)
--- `Slipwright-Agent-Setup.exe` (Windows), `Slipwright-Agent-mac-arm64.dmg` /
-`Slipwright-Agent-mac-x64.dmg` (Mac), `Slipwright-Agent.AppImage` or `slipwright-agent.deb`
-(Linux), and `slipwright-agent.cjs` for a server with no window (*On a server*, below).
-The connection code comes from Slipwright: **Settings → Machines → Connect a machine**.
+## One Slipwright gives the orders, every machine does the work
+
+<p align="center">
+  <img src="docs/demo.gif" alt="One Slipwright hands out phases to a MacBook, a Windows PC and a Linux server; each writes its phase with its own model, the Mac builds iOS, and the answers flow back until the development is done" width="100%">
+</p>
+
+Slipwright plans a development and splits it into phases. It never runs a model or a build
+on these machines itself: each agent **asks** for work it can do, and takes one phase at a
+time.
+
+- **Slipwright** keeps the plan, the gates and the order of the phases. It decides what is
+  next and checks every answer -- a wrong one is a retry, never a wrong file.
+- **Every machine you lend it** says what it can do -- `write:backend`, `write:web`, `ios`,
+  `android` … -- and is given only that. A Mac with Xcode gets the iOS builds; a Windows PC
+  with Codex writes the web phases; a Linux box over SSH runs `slipwright-agent.cjs` with
+  no window at all.
+- **Your own model, your own keys.** The phase is written on the machine with its own
+  Claude Code or Codex sign-in, or its own API key. Keys never leave it.
+- **From anywhere.** Plain HTTP on the same network, or sealed end to end through the relay
+  when the machine is somewhere else.
+
+Several machines can be lent to one account at once, so phases that do not depend on each
+other are written side by side.
+
+<p align="center">
+  <img src="docs/showcase.png" alt="The app: what this machine's agents are doing now, and one agent's live log" width="100%">
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/team-dark.png" alt="Paired with a Slipwright team through the relay"><br><sub><b>Pair once.</b> A code from Settings → Machines, used once.</sub></td>
+    <td width="50%"><img src="docs/models-dark.png" alt="Models found on this machine, and which agent uses which"><br><sub><b>Your models.</b> Claude Code, Codex or an API key, per agent.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/agent-backend-dark.png" alt="One agent writing a phase, with its live log"><br><sub><b>Watch it work.</b> Each agent's phase, progress and live log.</sub></td>
+    <td width="50%"><img src="docs/history-light.png" alt="Phases written and builds run on this machine"><br><sub><b>History.</b> What this machine wrote and built, and how long it took.</sub></td>
+  </tr>
+</table>
+
+## Getting started
+
+1. **Download** [the latest release](https://github.com/ksksertac/slipwright-agent/releases/latest)
+   -- `Slipwright-Agent-Setup.exe` (Windows), `Slipwright-Agent-mac-arm64.dmg` /
+   `Slipwright-Agent-mac-x64.dmg` (Mac), `Slipwright-Agent.AppImage` or `slipwright-agent.deb`
+   (Linux), or `slipwright-agent.cjs` for a server with no window (*On a server*, below).
+2. **Get a connection code** from Slipwright: **Settings → Machines → Connect a machine**.
+3. **Paste it** into the app, choose which agents this machine runs and with which model.
+   From then on it takes work by itself; pause it from the bottom of the window.
+
+## How it talks to Slipwright
 
 It speaks the worker protocol itself, in TypeScript -- plain HTTP to a server on the same
 network, or sealed end to end through the relay from anywhere. Nothing of Slipwright's
