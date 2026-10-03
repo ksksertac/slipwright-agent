@@ -2,13 +2,17 @@
 // no native module for it -- the server does the same in Python's `cryptography`, and the
 // tests hold both to the same vectors.
 //
+// All but the cipher. Electron's Node is built on BoringSSL, which offers no
+// chacha20-poly1305 to `createCipheriv`: the box sealed fine under the tests' Node and
+// threw "Unknown cipher" in the app, on the first pairing through the relay. So the AEAD
+// is @noble/ciphers, plain JavaScript, the same in Electron, Node and the bundled CLI.
+//
 // Node takes X25519 keys as KeyObjects, not raw bytes, so raw keys are wrapped in the
 // fixed DER prefixes for PKCS#8 / SPKI. That is what JWK import would do underneath, with
 // one fewer encoding (base64url) to get wrong.
 
+import { chacha20poly1305 } from "@noble/ciphers/chacha.js";
 import {
-  createCipheriv,
-  createDecipheriv,
   createHash,
   createHmac,
   createPrivateKey,
@@ -62,19 +66,13 @@ export function boxKey(mySecret: Uint8Array, theirPublic: Uint8Array, clientPk: 
 
 /** ChaCha20-Poly1305, laid out as Python's AEAD lays it out: ciphertext ‖ 16-byte tag. */
 export function seal(key: Uint8Array, nonce: Uint8Array, plaintext: Uint8Array, dir: Direction): Buffer {
-  const cipher = createCipheriv("chacha20-poly1305", key, nonce, { authTagLength: 16 });
-  cipher.setAAD(Buffer.from(dir), { plaintextLength: plaintext.length });
-  const body = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  return Buffer.concat([body, cipher.getAuthTag()]);
+  return Buffer.from(chacha20poly1305(key, nonce, Buffer.from(dir)).encrypt(plaintext));
 }
 
 /** Throws when the box was tampered with, sealed with another key, or for the other direction. */
 export function open(key: Uint8Array, nonce: Uint8Array, sealed: Uint8Array, dir: Direction): Buffer {
   if (sealed.length < 16) throw new Error("a box too short to hold its tag");
-  const decipher = createDecipheriv("chacha20-poly1305", key, nonce, { authTagLength: 16 });
-  decipher.setAAD(Buffer.from(dir), { plaintextLength: sealed.length - 16 });
-  decipher.setAuthTag(sealed.subarray(sealed.length - 16));
-  return Buffer.concat([decipher.update(sealed.subarray(0, sealed.length - 16)), decipher.final()]);
+  return Buffer.from(chacha20poly1305(key, nonce, Buffer.from(dir)).decrypt(sealed));
 }
 
 export function nonce(): Buffer {
