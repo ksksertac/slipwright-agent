@@ -16,6 +16,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { resolveChoice } from "@shared/resolve";
 import type { Detected, HistoryEntry } from "@shared/types";
 import { KEY_VENDORS } from "@shared/vendors";
+import { machineAbout } from "../main/about";
 import { capabilities as deriveCapabilities } from "../main/capabilities";
 import { pair, Unpaired, WorkerClient } from "../main/client";
 import { CodeError } from "../main/code";
@@ -231,6 +232,10 @@ async function run(p: Paths): Promise<void> {
     maxConcurrent: () => settings.maxConcurrent,
     workDir: () => settings.workDir,
     model: (agent) => resolveChoice({ agents: settings.agents, defaultProvider: null, providers: settings.providers }, agent),
+    about: () =>
+      machineAbout(capabilitiesOf(settings, found), (agent) =>
+        resolveChoice({ agents: settings.agents, defaultProvider: null, providers: settings.providers }, agent),
+      ),
     secret: (which) => settings.secrets[which],
     bitbucketUser: () => settings.bitbucketUser,
     jira: () => ({ ...settings.jira, account: jiraAccount }),
