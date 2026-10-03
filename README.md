@@ -64,6 +64,50 @@ other are written side by side.
   </tr>
 </table>
 
+## In the cloud: AWS EC2, Azure Virtual Machines
+
+<p align="center">
+  <img src="docs/cloud.gif" alt="Four cloud machines -- AWS EC2, EC2 Mac and two Azure VMs -- write phases side by side; Slipwright applies, builds, reviews and commits each in its turn on one branch, and opens one pull request" width="100%">
+</p>
+
+A machine you lend does not have to be on your desk. Start a few virtual machines --
+**AWS EC2**, **Azure Virtual Machines**, or any Linux box you can SSH into -- run
+`slipwright-agent.cjs` on each, and a development's phases are written on all of them at
+once instead of one after another.
+
+- **Written side by side.** A model's answer is where a phase's time goes -- minutes to most
+  of an hour -- so that is what Slipwright spreads out: the phase in its turn and the ready
+  ones after it that need nothing it does, three at a time by default (a project's
+  `max_parallel_phases`). Each goes to a machine whose agent can write it.
+- **Put together on one branch.** Every answer comes back to Slipwright, which applies,
+  builds, reviews and commits each phase **in plan order** on the one branch. No second
+  checkout, no merge, no conflicts to resolve -- one pull request at the end.
+- **iOS in the cloud too.** An **EC2 Mac** instance (`mac2.metal`, Xcode installed) takes the
+  `ios` builds, so a development with an iOS phase never waits for a laptop to wake up.
+  Azure has no macOS machines; there, a Mac of your own does the iOS builds.
+- **Nothing to open.** The agent asks Slipwright for work; nothing calls in. The VM needs no
+  inbound port -- outbound HTTPS to the relay (or your server) is enough.
+- **One code per machine.** Each VM pairs with its own code from **Settings → Machines →
+  Connect a machine**; give each a `name` in `settings.json` so you can tell them apart.
+
+On an Ubuntu VM (EC2 or Azure), as a user of its own -- the build commands it runs are
+written by a model:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs git
+sudo useradd -m slipwright && sudo -iu slipwright
+mkdir ~/slipwright && cd ~/slipwright
+curl -LO https://github.com/ksksertac/slipwright-agent/releases/latest/download/slipwright-agent.cjs
+node slipwright-agent.cjs init      # fill in "code", "name" and each agent's model
+node slipwright-agent.cjs check     # models found, agents, tokens, pairing
+node slipwright-agent.cjs           # pairs, then takes work
+```
+
+The rest -- `settings.json`, keys from the environment, a systemd unit to keep it running --
+is in [*On a server*](#on-a-server-slipwright-agent) below. An API key
+(`"anthropic": "env:ANTHROPIC_API_KEY"`) is the easiest model on a VM; Claude Code or Codex
+work too, once installed and signed in there.
+
 ## Getting started
 
 1. **Download** [the latest release](https://github.com/ksksertac/slipwright-agent/releases/latest)
