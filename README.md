@@ -22,8 +22,10 @@
 
 A desktop app (macOS, Windows, Linux) that lends this computer to a Slipwright account.
 Paired once with a connection code, it takes phases to **write** with the person's own
-model -- Claude Code or Codex as installed and signed in, or an Anthropic / OpenAI API key --
-and **builds** iOS and Android when the machine can (Xcode, Android SDK + JDK).
+model -- Claude Code or Codex as installed and signed in, or an API key for any provider
+Slipwright's own Models page offers: Anthropic, OpenAI, DeepSeek, Gemini, Qwen, GLM, MiniMax,
+OpenRouter or EVREN, with the models read from the key to pick from and one provider as the
+default -- and **builds** iOS and Android when the machine can (Xcode, Android SDK + JDK).
 
 ## One Slipwright gives the orders, every machine does the work
 
@@ -259,8 +261,13 @@ node slipwright-agent.cjs                    # pairs the first time, then takes 
 }
 ```
 
-- A model is `claude-code`, `codex`, `anthropic` or `openai`, optionally `:<model>`. Claude
-  Code and Codex must be installed and signed in on the server (`claude`, `codex login`).
+- A model is a provider, optionally `:<model>`: `claude-code`, `codex`, `anthropic`, `openai`,
+  `deepseek`, `gemini`, `qwen`, `glm`, `minimax`, `openrouter` or `evren`. The last seven
+  have no model everybody shares, so name one (`deepseek:deepseek-chat`, `evren:glm-5.3`).
+  Claude Code and Codex must be installed and signed in on the server (`claude`, `codex login`).
+- `keys` holds one key per provider used (`"deepseek": "env:DEEPSEEK_API_KEY"`), and an
+  optional `providers` block gives one another host or a longer answer:
+  `"providers": { "deepseek": { "base_url": "https://proxy/v1", "max_tokens": 64000 } }`.
 - Any secret may be `"env:NAME"`, read from the environment, so it can live in a systemd
   unit rather than the file. A file holding keys should be `chmod 600`; the program warns
   when others can read it.

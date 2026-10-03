@@ -2,7 +2,8 @@
 // state is read off the app state.
 
 import type { ReactNode } from "react";
-import type { AgentId, AppState, ModelChoice, TaskView } from "@shared/types";
+import { PROVIDER_LABEL, resolveChoice } from "@shared/resolve";
+import type { AgentId, AppState, ModelChoice, Result, TaskView } from "@shared/types";
 import { t } from "./i18n";
 
 const svg = (children: ReactNode, round = true) => (
@@ -110,10 +111,11 @@ export function Switch({ on, onChange, label, disabled }: { on: boolean; onChang
 
 export function modelLabel(choice: ModelChoice | null): string {
   if (!choice) return "—";
-  const name = { "claude-code": "Claude Code", codex: "Codex", anthropic: "Anthropic API", openai: "OpenAI API" }[choice.provider];
+  const name = t(PROVIDER_LABEL[choice.provider]);
   return choice.model ? `${name} · ${choice.model}` : name;
 }
 
+/** The same test the main process makes before asking for work (main/capabilities.ts). */
 export function usable(state: AppState, choice: ModelChoice | null): boolean {
   if (!choice) return false;
   const d = state.detected;
@@ -123,9 +125,10 @@ export function usable(state: AppState, choice: ModelChoice | null): boolean {
     case "codex":
       return d.codex.installed && d.codex.signedIn !== false;
     case "anthropic":
-      return !!state.secrets.anthropic;
     case "openai":
-      return !!state.secrets.openai;
+      return !!state.secrets[choice.provider];
+    default:
+      return !!state.secrets[choice.provider] && !!choice.model;
   }
 }
 
@@ -136,7 +139,7 @@ export function agentStatus(state: AppState, agent: AgentId): { status: AgentSta
   if (task) return { status: "run", task, why: null };
   const own = state.settings.agents[agent];
   if (!own.enabled) return { status: "off", task: null, why: t("off on this machine") };
-  if (!usable(state, own.model)) return { status: "off", task: null, why: t("no model") };
+  if (!usable(state, resolveChoice(state.settings, agent))) return { status: "off", task: null, why: t("no model") };
   return { status: "idle", task: null, why: null };
 }
 
@@ -205,7 +208,7 @@ export function AgentCard({ state, agent, full, now, onOpen }: { state: AppState
   const platforms = agent === "mobile" ? platformsLine(state) : null;
   let sub: string;
   if (!own.enabled) sub = t("This machine does not take {agent} phases", { agent: AGENT_NAME[agent] });
-  else if (!usable(state, own.model)) sub = t("Choose a model for this agent under Models");
+  else if (!usable(state, resolveChoice(state.settings, agent))) sub = t("Choose a model for this agent under Models");
   else if (platforms) {
     const d = state.detected;
     const versions = [d.ios.ok ? d.ios.detail : null, d.android.ok ? `Android ${d.android.detail}` : null].filter(Boolean).join(", ");
@@ -217,7 +220,7 @@ export function AgentCard({ state, agent, full, now, onOpen }: { state: AppState
         <div className="av">{Icon[agent]}</div>
         <div>
           <b>{AGENT_NAME[agent]}</b>
-          <small>{modelLabel(own.enabled || task ? own.model : null)}</small>
+          <small>{modelLabel(own.enabled || task ? resolveChoice(state.settings, agent) : null)}</small>
         </div>
         <span className={`pill ${pill}`}>{label}</span>
       </div>
@@ -226,3 +229,28 @@ export function AgentCard({ state, agent, full, now, onOpen }: { state: AppState
     </div>
   );
 }
+
+// -- a page's head, and the line a save or a test answers with ------------------------
+
+export function Head({ title, text, children }: { title: string; text?: string; children?: React.ReactNode }) {
+  return (
+    <div className="head">
+      <div>
+        <h2>{title}</h2>
+        {text && <p>{text}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+export function Outcome({ result }: { result: Result | null }) {
+  if (!result || (!result.message && result.ok)) return null;
+  return (
+    <div className={`ok-line${result.ok ? "" : " bad"}`}>
+      {result.ok ? Icon.check : Icon.cross} {result.message}
+    </div>
+  );
+}
+
+// -- Now ------------------------------------------------------------------------------

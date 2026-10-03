@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { fromApp, parseModel, readSettings, SettingsError, template } from "../src/cli/settings";
 import { forgetState, readState, writeState } from "../src/cli/state";
+import { KEY_VENDORS, type KeyVendor } from "../src/shared/vendors";
 
 const read = (raw: unknown, env: NodeJS.ProcessEnv = {}) => readSettings(raw, { env, defaultWorkDir: "./work" });
 
@@ -20,7 +21,8 @@ describe("settings.json on a server", () => {
   it("reads a model as provider and optional model", () => {
     expect(parseModel("claude-code", "x")).toEqual({ provider: "claude-code", model: "" });
     expect(parseModel("codex:gpt-5", "x")).toEqual({ provider: "codex", model: "gpt-5" });
-    expect(() => parseModel("gemini", "agents.web.model")).toThrow(SettingsError);
+    expect(parseModel("gemini:gemini-2.5-pro", "x")).toEqual({ provider: "gemini", model: "gemini-2.5-pro" });
+    expect(() => parseModel("bard", "agents.web.model")).toThrow(SettingsError);
   });
 
   it("takes a secret from the environment when it says env:", () => {
@@ -69,8 +71,10 @@ describe("the app's choices, saved for a server", () => {
     runBuilds: false,
     bitbucketUser: null,
     jira: { site: "acme.atlassian.net", email: "a@acme.com" },
+    providers: {},
   };
-  const secrets = { anthropic: "sk-ant-1", openai: null, github: "ghp_1", bitbucket: null, jira: "ATATT1" };
+  const none = Object.fromEntries(KEY_VENDORS.map((v) => [v, null])) as Record<KeyVendor, string | null>;
+  const secrets = { ...none, anthropic: "sk-ant-1", github: "ghp_1", bitbucket: null, jira: "ATATT1" };
 
   it("reads back on the server as the same choices", () => {
     const { settings, warnings } = read(fromApp(app, secrets, "srv", true));
@@ -86,7 +90,7 @@ describe("the app's choices, saved for a server", () => {
     const file = fromApp(app, secrets, "srv", false);
     expect(JSON.stringify(file)).not.toContain("sk-ant-1");
     expect(file.keys?.anthropic).toBe("env:ANTHROPIC_API_KEY");
-    expect(file.keys?.openai).toBe(""); // none here: nothing to name
+    expect(file.keys?.openai).toBeUndefined(); // none here: nothing to name
     const { settings } = read(file, { ANTHROPIC_API_KEY: "sk-ant-server" });
     expect(settings.secrets.anthropic).toBe("sk-ant-server");
   });
@@ -109,5 +113,35 @@ describe("the pairing beside it", () => {
     if (process.platform !== "win32") expect(statSync(path).mode & 0o077).toBe(0);
     forgetState(path);
     expect(readState(path)).toBeNull();
+  });
+});
+
+describe("a vendor beyond Anthropic and OpenAI", () => {
+  it("goes to the server with its key, its model and its own host", () => {
+    const none = Object.fromEntries(KEY_VENDORS.map((v) => [v, null])) as Record<KeyVendor, string | null>;
+    const app = {
+      agents: {
+        backend: { enabled: true, model: { provider: "deepseek" as const, model: "deepseek-chat" } },
+        web: { enabled: true, model: { provider: "evren" as const, model: "glm-5.3" } },
+        mobile: { enabled: false, model: null },
+        devops: { enabled: false, model: null },
+      },
+      providers: { deepseek: { model: "deepseek-chat", baseUrl: "https://proxy.example/v1", maxTokens: 64000 } },
+      maxConcurrent: 1,
+      runBuilds: true,
+      bitbucketUser: null,
+      jira: { site: "", email: "" },
+    };
+    const secrets = { ...none, deepseek: "sk-ds-1", evren: "evren_llm_1", github: null, bitbucket: null, jira: null };
+    const { settings, warnings } = read(fromApp(app, secrets, "srv", true));
+    expect(warnings).toEqual([]);
+    expect(settings.agents.backend.model).toEqual({ provider: "deepseek", model: "deepseek-chat" });
+    expect(settings.secrets.evren).toBe("evren_llm_1");
+    expect(settings.providers.deepseek).toEqual({ model: "", baseUrl: "https://proxy.example/v1", maxTokens: 64000 });
+  });
+
+  it("is a warning when it is named without a model, since it has no default anyone shares", () => {
+    const { warnings } = read({ agents: { web: { model: "deepseek" } }, keys: { deepseek: "sk-ds-1" } });
+    expect(warnings.join("\n")).toContain('"deepseek:<model>"');
   });
 });

@@ -95,7 +95,8 @@ export function App() {
   if (agentPage && AGENTS.includes(agentPage)) body = <AgentPage state={state} agent={agentPage} now={now} />;
   else if (page === "history") body = <HistoryPage state={state} />;
   else if (page === "team") body = <TeamPage state={state} />;
-  else if (page === "models") body = <ModelsPage state={state} />;
+  // "models:evren" opens that provider's card, for a screenshot of one
+  else if (page.split(":")[0] === "models") body = <ModelsPage state={state} open={page.split(":")[1] ?? null} />;
   else if (page === "source") body = <SourcePage state={state} />;
   else if (page === "jira") body = <JiraPage state={state} />;
   else if (page === "settings") body = <SettingsPage state={state} />;
@@ -140,7 +141,7 @@ export function App() {
           <Item page="team" current={page} go={go} icon={Icon.team}>
             <span className="grow">{t("Slipwright team")}</span>
           </Item>
-          <Item page="models" current={page} go={go} icon={Icon.models}>
+          <Item page="models" current={page.split(":")[0] ?? page} go={go} icon={Icon.models}>
             <span className="grow">{t("Models")}</span>
           </Item>
           <Item page="source" current={page} go={go} icon={Icon.source}>

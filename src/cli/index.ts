@@ -13,7 +13,9 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { resolveChoice } from "@shared/resolve";
 import type { Detected, HistoryEntry } from "@shared/types";
+import { KEY_VENDORS } from "@shared/vendors";
 import { capabilities as deriveCapabilities } from "../main/capabilities";
 import { pair, Unpaired, WorkerClient } from "../main/client";
 import { CodeError } from "../main/code";
@@ -159,12 +161,14 @@ function capabilitiesOf(settings: AgentSettingsFile, found: Detected): string[] 
       workDir: settings.workDir,
       theme: "system",
       agents: settings.agents,
+      defaultProvider: null,
+      providers: settings.providers,
       github: { user: null },
       bitbucket: { user: settings.bitbucketUser },
       jira: { ...settings.jira, account: null },
     },
     found,
-    { anthropic: !!settings.secrets.anthropic, openai: !!settings.secrets.openai },
+    Object.fromEntries(KEY_VENDORS.map((v) => [v, !!settings.secrets[v]])),
   );
 }
 
@@ -226,7 +230,7 @@ async function run(p: Paths): Promise<void> {
     holding: () => (settings.paused ? "paused" : null),
     maxConcurrent: () => settings.maxConcurrent,
     workDir: () => settings.workDir,
-    model: (agent) => settings.agents[agent].model,
+    model: (agent) => resolveChoice({ agents: settings.agents, defaultProvider: null, providers: settings.providers }, agent),
     secret: (which) => settings.secrets[which],
     bitbucketUser: () => settings.bitbucketUser,
     jira: () => ({ ...settings.jira, account: jiraAccount }),

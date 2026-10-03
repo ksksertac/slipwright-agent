@@ -2,36 +2,16 @@
 // `window.agent`; none of them holds anything of its own that matters past a re-render.
 
 import { useEffect, useState } from "react";
-import type { AgentId, AppState, HistoryEntry, ModelChoice, ProviderId, Result } from "@shared/types";
+import type { AgentId, AppState, HistoryEntry, Result } from "@shared/types";
 import { AGENTS } from "@shared/types";
 import { t } from "./i18n";
 import logo from "./logo.png";
-import { AGENT_NAME, AgentCard, DOMAINS, Icon, Switch } from "./parts";
+import { ModelPick } from "./models";
+import { AGENT_NAME, AgentCard, DOMAINS, Head, Icon, Outcome, Switch } from "./parts";
+
+export { ModelsPage } from "./models";
 
 export type Go = (page: string) => void;
-
-function Head({ title, text, children }: { title: string; text?: string; children?: React.ReactNode }) {
-  return (
-    <div className="head">
-      <div>
-        <h2>{title}</h2>
-        {text && <p>{text}</p>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Outcome({ result }: { result: Result | null }) {
-  if (!result || (!result.message && result.ok)) return null;
-  return (
-    <div className={`ok-line${result.ok ? "" : " bad"}`}>
-      {result.ok ? Icon.check : Icon.cross} {result.message}
-    </div>
-  );
-}
-
-// -- Now ------------------------------------------------------------------------------
 
 export function Welcome({ go }: { go: Go }) {
   return (
@@ -69,48 +49,6 @@ export function Now({ state, go, now }: { state: AppState; go: Go; now: number }
 }
 
 // -- an agent -------------------------------------------------------------------------
-
-const PROVIDERS: { id: ProviderId; name: string }[] = [
-  { id: "claude-code", name: "Claude Code" },
-  { id: "codex", name: "Codex" },
-  { id: "anthropic", name: "Anthropic API" },
-  { id: "openai", name: "OpenAI API" },
-];
-
-export function ModelPick({ agent, state }: { agent: AgentId; state: AppState }) {
-  const choice = state.settings.agents[agent].model;
-  const [model, setModel] = useState(choice?.model ?? "");
-  useEffect(() => setModel(choice?.model ?? ""), [choice?.model, choice?.provider]);
-  const save = (next: ModelChoice | null) => void window.agent.saveAgent(agent, { model: next });
-  return (
-    <div className="model-pick">
-      <select
-        className="select"
-        aria-label={t("Model")}
-        value={choice?.provider ?? ""}
-        onChange={(e) => save(e.target.value ? { provider: e.target.value as ProviderId, model: "" } : null)}
-      >
-        <option value="">—</option>
-        {PROVIDERS.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-      {choice && (
-        <div className="input">
-          <input
-            value={model}
-            placeholder={t("Model name (empty: default)")}
-            onChange={(e) => setModel(e.target.value)}
-            onBlur={() => model.trim() !== choice.model && save({ ...choice, model: model.trim() })}
-            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function AgentPage({ state, agent, now }: { state: AppState; agent: AgentId; now: number }) {
   const own = state.settings.agents[agent];
@@ -272,133 +210,6 @@ export function TeamPage({ state }: { state: AppState }) {
               {t("Leave this team")}
             </button>
           )}
-        </div>
-      </div>
-    </>
-  );
-}
-
-// -- Models ---------------------------------------------------------------------------
-
-function KeyRow({ mark, name, secret, which }: { mark: string; name: string; secret: string | null; which: "anthropic" | "openai" }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState("");
-  const save = async (v: string | null) => {
-    await window.agent.saveSecret(which, v);
-    setEditing(false);
-    setValue("");
-  };
-  return (
-    <div className="prov">
-      <div className="logo-sq">{mark}</div>
-      <div>
-        <b>{name}</b>
-        <small>{secret ?? t("No key")}</small>
-      </div>
-      <div className="row-btns">
-        {secret && !editing && (
-          <button className="btn" onClick={() => void save(null)}>
-            {t("Remove")}
-          </button>
-        )}
-        <button className="btn" onClick={() => setEditing(!editing)}>
-          {editing ? t("Cancel") : secret ? t("Change") : t("Add key")}
-        </button>
-      </div>
-      {editing && (
-        <div className="edit">
-          <div className="input">
-            <input type="password" autoFocus value={value} placeholder={which === "anthropic" ? "sk-ant-…" : "sk-…"} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && value.trim() && void save(value)} />
-          </div>
-          <button className="btn primary" disabled={!value.trim()} onClick={() => void save(value)}>
-            {t("Save")}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CliRow({ mark, name, kind, info, install }: { mark: string; name: string; kind: string; info: AppState["detected"]["claude"]; install: string }) {
-  const found = name === "Claude Code" ? t("claude CLI found") : t("codex CLI found");
-  const parts = info.installed ? [kind, found, info.version, info.signedIn ? t("signed in") : t("sign-in not known")] : [kind, t("not installed")];
-  const line = parts.filter(Boolean).join(" · ");
-  return (
-    <div className="prov">
-      <div className="logo-sq">{mark}</div>
-      <div>
-        <b>{name}</b>
-        <small>{line}</small>
-        {!info.installed && (
-          <div className="mono">
-            {t("Install with")}: {install}
-          </div>
-        )}
-      </div>
-      <span className={`pill inline ${info.installed ? (info.signedIn ? "p-idle" : "p-warn") : "p-off"}`}>{info.installed ? t("ready") : t("not found")}</span>
-    </div>
-  );
-}
-
-function platformWhy(detail: string | null, platform: "ios" | "android"): string {
-  if (platform === "ios") {
-    if (detail === "no-xcode") return t("Xcode not found");
-    if (detail === "xcode-unopened") return t("Xcode is installed but was never opened");
-    return t("iOS builds need a Mac");
-  }
-  return detail === "no-jdk" ? t("Android SDK found but no JDK") : t("Android SDK not found");
-}
-
-export function ModelsPage({ state }: { state: AppState }) {
-  const d = state.detected;
-  const [looking, setLooking] = useState(false);
-  return (
-    <>
-      <Head title={t("Models")} text={t("The agents write with this machine's own subscription or key. Keys never leave this machine.")}>
-        <button
-          className="btn"
-          disabled={looking}
-          onClick={async () => {
-            setLooking(true);
-            await window.agent.detect();
-            setLooking(false);
-          }}
-        >
-          {t("Look again")}
-        </button>
-      </Head>
-      <div className="card">
-        <CliRow mark="CC" name="Claude Code" kind={t("Subscription")} info={d.claude} install="npm install -g @anthropic-ai/claude-code" />
-        <CliRow mark="CX" name="Codex" kind={t("ChatGPT plan")} info={d.codex} install="npm install -g @openai/codex" />
-        <KeyRow mark="A" name={t("Anthropic API")} secret={state.secrets.anthropic} which="anthropic" />
-        <KeyRow mark="O" name={t("OpenAI API")} secret={state.secrets.openai} which="openai" />
-      </div>
-      <div className="card form">
-        <div className="sec">
-          <h3>{t("Which agent uses which model")}</h3>
-        </div>
-        <table>
-          <tbody>
-            {AGENTS.map((agent) => (
-              <tr key={agent}>
-                <td style={{ width: 120 }}>{AGENT_NAME[agent]}</td>
-                <td>{state.settings.agents[agent].enabled ? <ModelPick agent={agent} state={state} /> : <span className="mono">{t("off on this machine")}</span>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="card form">
-        <div className="sec">
-          <h3>{t("Platforms this machine builds")}</h3>
-        </div>
-        <div className="meta">
-          <span>
-            iOS <b>{d.ios.ok ? d.ios.detail : platformWhy(d.ios.detail, "ios")}</b>
-          </span>
-          <span>
-            Android <b>{d.android.ok ? d.android.detail : platformWhy(d.android.detail, "android")}</b>
-          </span>
         </div>
       </div>
     </>
