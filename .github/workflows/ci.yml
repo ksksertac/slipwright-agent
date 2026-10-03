@@ -42,6 +42,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      # Electron's Node is not the one above: its crypto is BoringSSL (scripts/test-electron.mjs)
+      - run: npm run test:electron
       - run: npm run build:cli
 
   # What this run is released as: nothing for a pull request; a pushed tag's own number;
