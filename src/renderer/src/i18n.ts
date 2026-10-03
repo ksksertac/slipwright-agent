@@ -247,6 +247,10 @@ const tr: Record<string, string> = {
   "This copy cannot replace itself: download it from the release page and install it over this one.":
     "Bu kopya kendini değiştiremez: sürüm sayfasından indirip bunun üzerine kur.",
   "Check for updates": "Güncellemeleri denetle",
+  "Download it and drag Slipwright Agent into Applications, over this one.": "İndir ve Slipwright Agent'ı Uygulamalar klasörüne, bunun üzerine sürükle.",
+  "Then paste this into Terminal once -- otherwise macOS says the app is damaged:": "Sonra bunu bir kez Terminal'e yapıştır — yoksa macOS uygulamanın hasarlı olduğunu söyler:",
+  Copy: "Kopyala",
+  Copied: "Kopyalandı",
   "Version {version}": "Sürüm {version}",
   "This is the newest version.": "En yeni sürüm bu.",
 };

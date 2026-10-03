@@ -136,6 +136,8 @@ export interface UpdateView {
   error: string | null;
   /** Whether this copy installs it itself; a Mac or a .deb is sent to the release page. */
   self: boolean;
+  /** A Mac: one installed by hand also needs its quarantine cleared, or it is "damaged". */
+  mac: boolean;
 }
 
 export interface AppState {
