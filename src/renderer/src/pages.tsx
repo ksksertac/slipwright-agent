@@ -524,6 +524,15 @@ export function SettingsPage({ state }: { state: AppState }) {
   const [max, setMax] = useState(String(s.maxConcurrent));
   const [withSecrets, setWithSecrets] = useState(false);
   const [exported, setExported] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checked, setChecked] = useState(false);
+  // a newer one opens its own dialog; only "nothing newer" needs saying here
+  const check = async () => {
+    setChecking(true);
+    await window.agent.checkForUpdates();
+    setChecking(false);
+    setChecked(true);
+  };
   const toggles: [keyof typeof s, string, string][] = [
     ["runBuilds", t("Run build and test commands on this machine"), t("The commands the agents wrote run in a folder of their own, with a restricted environment.")],
     ["startAtLogin", t("Start when the computer starts"), t("Runs in the background with a tray icon.")],
@@ -596,6 +605,17 @@ export function SettingsPage({ state }: { state: AppState }) {
             {t("Save settings.json")}
           </button>
           {exported && <span className="muted small">{t("Saved: {path}", { path: exported })}</span>}
+        </div>
+      </div>
+      <div className="card form" style={{ marginTop: 16 }}>
+        <div className="toggle-row">
+          <div className="sec">
+            <h3>{t("Version {version}", { version: state.version })}</h3>
+            {checked && state.update.phase === "none" && <p>{t("This is the newest version.")}</p>}
+          </div>
+          <button className="btn" disabled={checking} onClick={() => void check()}>
+            {t("Check for updates")}
+          </button>
         </div>
       </div>
     </>

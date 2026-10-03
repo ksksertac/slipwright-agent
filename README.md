@@ -85,9 +85,11 @@ repository: [docs/machines-protocol.md](https://github.com/ksksertac/slipwright/
 
 This app is released apart from [Slipwright](https://github.com/ksksertac/slipwright):
 every merge to `main` here is the next patch (`v1.0.3` → `v1.0.4`), built for every
-platform by CI and published as a GitHub release. A running app updates itself from those
-releases (Windows and the AppImage; a Mac is told, since an unsigned app cannot replace
-itself there), and `slipwright-agent` on a server says when a newer one is out.
+platform by CI and published as a GitHub release. A running app says when one is out --
+under its version in the corner, and in a dialog with the release's notes -- and on Windows
+and the AppImage downloads it and restarts into it at a press each (a Mac or a .deb is sent
+to the release page, since an unsigned app cannot replace itself there). `slipwright-agent`
+on a server says when a newer one is out.
 
 What the two must agree on is the worker protocol. The app sends its number with every
 request (`x-slipwright-protocol`, `src/main/protocol.ts`); a server that no longer speaks it
@@ -131,6 +133,7 @@ If `npm run dev` starts Node instead of a window, `ELECTRON_RUN_AS_NODE` is set 
 `npx electron . --screenshot shot.png [--theme light|dark] [--page models] [--demo]` renders
 the window once, saves it and quits -- how the UI is checked without a person clicking.
 `--demo` fills it with a made-up pairing and two running phases; it never talks to a server.
+`--update available|downloading|ready|error` opens the newer-version dialog in that phase.
 
 `test/live.test.ts` pairs with a real server when `SLIPWRIGHT_LIVE_CODE` is set; the comment
 in it says how to get one from a local `slipwright serve`.

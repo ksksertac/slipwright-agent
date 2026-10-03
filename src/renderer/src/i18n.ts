@@ -185,6 +185,28 @@ const tr: Record<string, string> = {
   System: "Sistem",
   Light: "Açık",
   Dark: "Koyu",
+
+  // a newer version
+  "v{version} is out": "v{version} çıktı",
+  "v{version} is ready": "v{version} hazır",
+  "Slipwright Agent {version} is out": "Slipwright Agent {version} çıktı",
+  "You have {version}.": "Sendeki sürüm {version}.",
+  "What changes": "Neler değişiyor",
+  Later: "Sonra",
+  Download: "İndir",
+  "Downloading… {n}%": "İndiriliyor… %{n}",
+  "Restart and install": "Yeniden başlat ve kur",
+  "Downloaded. The app closes, installs it and opens again.": "İndirildi. Uygulama kapanır, kurar ve yeniden açılır.",
+  "A phase this machine is writing now is taken back by Slipwright and written by the account's own model.":
+    "Bu makinenin şu an yazdığı faz Slipwright tarafından geri alınır ve hesabın kendi modeliyle yazılır.",
+  "The download did not finish: {error}": "İndirme tamamlanamadı: {error}",
+  "Try again": "Tekrar dene",
+  "Open the download page": "İndirme sayfasını aç",
+  "This copy cannot replace itself: download it from the release page and install it over this one.":
+    "Bu kopya kendini değiştiremez: sürüm sayfasından indirip bunun üzerine kur.",
+  "Check for updates": "Güncellemeleri denetle",
+  "Version {version}": "Sürüm {version}",
+  "This is the newest version.": "En yeni sürüm bu.",
 };
 
 const tables: Record<Lang, Record<string, string>> = { tr, en: {} };
