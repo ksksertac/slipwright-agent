@@ -9,11 +9,12 @@
 import { EventEmitter } from "node:events";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import type { AgentId, HistoryEntry, LogLine, ModelChoice, TaskView } from "@shared/types";
+import type { AgentId, HistoryEntry, LogLine, ResolvedChoice, TaskView } from "@shared/types";
+import { VENDORS, type KeyVendor } from "@shared/vendors";
 import { runBuild } from "./build";
 import { agentFor } from "./capabilities";
 import { Unpaired, WorkerClient, type Build, type Call, type Task } from "./client";
-import { callAnthropic, callOpenAI } from "./models/api";
+import { callAnthropic, callCompat } from "./models/api";
 import { callClaude } from "./models/claude";
 import { callCodex } from "./models/codex";
 import { Cancelled, ModelFailure, type ModelAnswer, type ModelCall } from "./models/types";
@@ -33,8 +34,9 @@ export interface WorkerHost {
   holding(): string | null;
   maxConcurrent(): number;
   workDir(): string;
-  model(agent: AgentId): ModelChoice | null;
-  secret(name: "anthropic" | "openai" | "github" | "bitbucket" | "jira"): string | null;
+  /** The provider and model the agent writes with, the default provider's if it names none. */
+  model(agent: AgentId): ResolvedChoice | null;
+  secret(name: KeyVendor | "github" | "bitbucket" | "jira"): string | null;
   bitbucketUser(): string | null;
   jira(): { site: string; email: string; account: string | null };
   rememberJiraAccount(account: string): void;
@@ -339,22 +341,13 @@ export class Worker extends EventEmitter {
     }
   }
 
-  private ask(choice: ModelChoice, call: ModelCall): Promise<ModelAnswer> {
-    switch (choice.provider) {
-      case "claude-code":
-        return callClaude(call);
-      case "codex":
-        return callCodex(call);
-      case "anthropic": {
-        const key = this.host.secret("anthropic");
-        if (!key) throw new ModelFailure("no Anthropic API key on this machine", "rejected");
-        return callAnthropic(call, key);
-      }
-      case "openai": {
-        const key = this.host.secret("openai");
-        if (!key) throw new ModelFailure("no OpenAI API key on this machine", "rejected");
-        return callOpenAI(call, key);
-      }
-    }
+  private ask(choice: ResolvedChoice, call: ModelCall): Promise<ModelAnswer> {
+    if (choice.provider === "claude-code") return callClaude(call);
+    if (choice.provider === "codex") return callCodex(call);
+    const vendor = choice.provider;
+    const key = this.host.secret(vendor);
+    if (!key) throw new ModelFailure(`no ${VENDORS[vendor].label} key on this machine`, "rejected");
+    const options = { baseUrl: choice.baseUrl, maxTokens: choice.maxTokens };
+    return vendor === "anthropic" ? callAnthropic(call, key, options) : callCompat(call, key, vendor, options);
   }
 }

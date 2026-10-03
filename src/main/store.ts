@@ -8,6 +8,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { AGENTS, type AgentId, type AgentSettings, type Pairing, type Settings } from "@shared/types";
+import type { KeyVendor } from "@shared/vendors";
 
 export interface Sealer {
   available(): boolean;
@@ -20,8 +21,7 @@ export type SecretName =
   | "token"
   | "relayClientSk"
   | "serverPk"
-  | "anthropic"
-  | "openai"
+  | KeyVendor
   | "github"
   | "bitbucket"
   | "jira";
@@ -40,6 +40,8 @@ export function defaultSettings(): Settings {
     workDir: join(homedir(), "Slipwright Agent", "work"),
     theme: "system",
     agents,
+    defaultProvider: null,
+    providers: {},
     github: { user: null },
     bitbucket: { user: null },
     jira: { site: "", email: "", account: null },
@@ -95,7 +97,7 @@ export class Store {
       const agents = { ...base.agents };
       for (const a of AGENTS) agents[a] = { ...base.agents[a], ...(s.agents?.[a] ?? {}) };
       return {
-        settings: { ...base, ...s, agents, jira: { ...base.jira, ...(s.jira ?? {}) } },
+        settings: { ...base, ...s, agents, providers: { ...(s.providers ?? {}) }, jira: { ...base.jira, ...(s.jira ?? {}) } },
         pairing: raw.pairing ?? null,
       };
     } catch {

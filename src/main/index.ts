@@ -21,10 +21,13 @@ import {
   shell,
   Tray,
 } from "electron";
-import type { AgentId, AgentSettings, AppState, Connection, Detected, HistoryEntry, Result, Secrets, Settings, UpdateView } from "@shared/types";
+import type { AgentId, AgentSettings, AppState, Connection, Detected, HistoryEntry, ProviderId, ProviderSettings, Result, Secrets, Settings, UpdateView } from "@shared/types";
 import { AGENTS } from "@shared/types";
+import { PROVIDER_IDS, resolveChoice } from "@shared/resolve";
+import { isKeyVendor, KEY_VENDORS, type KeyVendor } from "@shared/vendors";
+import { acceptEvrenTerms, evrenTerms, listModels } from "./models/catalog";
 import { fromApp } from "../cli/settings";
-import { capabilities as deriveCapabilities } from "./capabilities";
+import { capabilities as deriveCapabilities, type Keys } from "./capabilities";
 import { pair, Unpaired, WorkerClient } from "./client";
 import { CodeError } from "./code";
 import { publicFromSecret } from "./crypto";
@@ -74,8 +77,8 @@ if (!SCREENSHOT && !app.requestSingleInstanceLock()) app.quit();
 
 // -- state ----------------------------------------------------------------------------
 
-function keys() {
-  return { anthropic: !!store.secret("anthropic"), openai: !!store.secret("openai") };
+function keys(): Keys {
+  return Object.fromEntries(KEY_VENDORS.map((v) => [v, !!store.secret(v)]));
 }
 
 function capabilities(): string[] {
@@ -87,7 +90,7 @@ function holding(): "battery" | null {
 }
 
 function secretsView(): Secrets {
-  const names: (keyof Secrets)[] = ["anthropic", "openai", "github", "bitbucket", "jira"];
+  const names: (keyof Secrets)[] = [...KEY_VENDORS, "github", "bitbucket", "jira"];
   return Object.fromEntries(names.map((n) => [n, hint(store.secret(n))])) as unknown as Secrets;
 }
 
@@ -421,7 +424,7 @@ function ipc(): void {
     worker.kick();
   });
   ipcMain.handle("saveSecret", (_e, name: keyof Secrets, value: string | null) => {
-    if (!["anthropic", "openai", "github", "bitbucket", "jira"].includes(name)) return;
+    if (![...KEY_VENDORS, "github", "bitbucket", "jira"].includes(name)) return;
     store.setSecret(name, value ? String(value).trim() : null);
     push();
     worker.kick();
@@ -429,6 +432,36 @@ function ipc(): void {
   ipcMain.handle("saveSource", (_e, github: string | null, user: string | null, bitbucket: string | null) => verifySource(github, user, bitbucket));
   ipcMain.handle("saveJira", (_e, site: string, email: string, token: string | null) => verifyJira(site, email, token));
   ipcMain.handle("detect", () => redetect());
+  ipcMain.handle("listModels", (_e, provider: ProviderId, key: string | null, baseUrl: string | null) => {
+    if (!PROVIDER_IDS.includes(provider)) return { ok: false, models: [], message: "unknown provider" };
+    // a key being typed is tried before it is kept; otherwise the one kept is used
+    const own = isKeyVendor(provider) ? store.secret(provider) : null;
+    const base = baseUrl ?? store.settings.providers[provider]?.baseUrl ?? null;
+    return listModels(provider, key?.trim() || own, base);
+  });
+  ipcMain.handle("saveProvider", (_e, provider: ProviderId, patch: Partial<ProviderSettings>) => {
+    if (!PROVIDER_IDS.includes(provider)) return;
+    const was = store.settings.providers[provider] ?? { model: "", baseUrl: null, maxTokens: null };
+    const next = { ...was, ...patch };
+    const max = Number(next.maxTokens);
+    store.settings.providers[provider] = {
+      model: String(next.model ?? "").trim(),
+      baseUrl: next.baseUrl ? String(next.baseUrl).trim() || null : null,
+      maxTokens: Number.isInteger(max) && max > 0 ? max : null,
+    };
+    store.save();
+    push();
+    worker.kick();
+  });
+  ipcMain.handle("setDefaultProvider", (_e, provider: ProviderId | null) => {
+    if (provider !== null && !PROVIDER_IDS.includes(provider)) return;
+    store.settings.defaultProvider = provider;
+    store.save();
+    push();
+    worker.kick();
+  });
+  ipcMain.handle("evrenTerms", () => evrenTerms(store.secret("evren"), store.settings.providers.evren?.baseUrl ?? null));
+  ipcMain.handle("acceptEvrenTerms", (_e, version: number) => acceptEvrenTerms(store.secret("evren"), store.settings.providers.evren?.baseUrl ?? null, Number(version)));
   ipcMain.handle("checkForUpdates", () => checkForUpdates());
   ipcMain.handle("downloadUpdate", () => downloadUpdate());
   ipcMain.handle("installUpdate", () => {
@@ -442,17 +475,21 @@ function ipc(): void {
       filters: [{ name: "JSON", extensions: ["json"] }],
     });
     if (picked.canceled || !picked.filePath) return { ok: false, message: "" };
+    // a server's file names each agent's model outright: it has no default of its own
+    const agents = Object.fromEntries(
+      AGENTS.map((a) => [a, { enabled: store.settings.agents[a].enabled, model: resolveChoice(store.settings, a) }]),
+    ) as Record<AgentId, AgentSettings>;
     const file = fromApp(
       {
-        agents: store.settings.agents,
+        agents,
+        providers: store.settings.providers,
         maxConcurrent: store.settings.maxConcurrent,
         runBuilds: store.settings.runBuilds,
         bitbucketUser: store.settings.bitbucket.user,
         jira: store.settings.jira,
       },
       {
-        anthropic: store.secret("anthropic"),
-        openai: store.secret("openai"),
+        ...(Object.fromEntries(KEY_VENDORS.map((v) => [v, store.secret(v)])) as Record<KeyVendor, string | null>),
         github: store.secret("github"),
         bitbucket: store.secret("bitbucket"),
         jira: store.secret("jira"),
@@ -502,7 +539,7 @@ void app.whenReady().then(async () => {
     holding: () => (store.settings.paused ? "paused" : holding()),
     maxConcurrent: () => store.settings.maxConcurrent,
     workDir: () => store.settings.workDir,
-    model: (agent) => store.settings.agents[agent].model,
+    model: (agent) => resolveChoice(store.settings, agent),
     secret: (name) => store.secret(name),
     bitbucketUser: () => store.settings.bitbucket.user,
     jira: () => store.settings.jira,
@@ -562,13 +599,13 @@ function demoState(base: AppState): AppState {
   agents.backend = { enabled: true, model: { provider: "claude-code", model: "sonnet" } };
   agents.web = { enabled: true, model: { provider: "codex", model: "gpt-5" } };
   agents.mobile = { enabled: true, model: { provider: "claude-code", model: "opus" } };
-  agents.devops = { enabled: false, model: null };
+  agents.devops = { enabled: true, model: null };
   return {
     ...base,
     machineName: "Ayşe'nin MacBook'u",
     pairing: { workerId: "demo", name: "Ayşe'nin MacBook'u", address: null, relay: { host: "relay.slipwright.app", room: "00" }, pairedAt: at(86400) },
     connection: "connected",
-    settings: { ...base.settings, agents },
+    settings: { ...base.settings, agents, defaultProvider: "evren", providers: { evren: { model: "deepseek-v4-flash", baseUrl: null, maxTokens: null } } },
     detected: {
       claude: { installed: true, version: "2.1.0 (Claude Code)", signedIn: true },
       codex: { installed: true, version: "codex-cli 0.50.0", signedIn: true },
@@ -576,7 +613,7 @@ function demoState(base: AppState): AppState {
       android: { ok: true, detail: "SDK 36" },
       checkedAt: at(10),
     },
-    secrets: { ...base.secrets, anthropic: "sk-ant-••••3f9A", github: "github_pat_••••8Kq2" },
+    secrets: { ...base.secrets, anthropic: "sk-ant-••••3f9A", evren: "evren_llm_••••-bco", github: "github_pat_••••8Kq2" },
     tasks: [
       {
         id: "demo-1", kind: "write", agent: "backend", project: "Randevu uygulaması",

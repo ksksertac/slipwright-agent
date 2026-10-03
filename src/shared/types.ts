@@ -4,16 +4,36 @@
 export const AGENTS = ["backend", "web", "mobile", "devops"] as const;
 export type AgentId = (typeof AGENTS)[number];
 
-export type ProviderId = "claude-code" | "codex" | "anthropic" | "openai";
+import type { KeyVendor } from "./vendors";
+
+/** A signed-in CLI, or a vendor called with this machine's own key (shared/vendors.ts). */
+export type ProviderId = "claude-code" | "codex" | KeyVendor;
 
 export interface ModelChoice {
   provider: ProviderId;
-  /** Empty means the provider's own default (the CLI's, or ours for an API key). */
+  /** Empty means the provider's default model, as set under Models. */
   model: string;
+}
+
+/** What is set for one provider under Models, as on Slipwright's own Models page. */
+export interface ProviderSettings {
+  /** The model an agent gets when it names this provider and no model. */
+  model: string;
+  /** Another host for the same API (a proxy); null for the vendor's own. */
+  baseUrl: string | null;
+  /** The longest answer asked for in one call; null for the vendor's usual. */
+  maxTokens: number | null;
+}
+
+/** A choice made whole: the provider, its model, and where and how to call it. */
+export interface ResolvedChoice extends ModelChoice {
+  baseUrl: string | null;
+  maxTokens: number | null;
 }
 
 export interface AgentSettings {
   enabled: boolean;
+  /** Null: the default provider (Settings.defaultProvider) with its default model. */
   model: ModelChoice | null;
 }
 
@@ -27,6 +47,9 @@ export interface Settings {
   workDir: string;
   theme: "system" | "light" | "dark";
   agents: Record<AgentId, AgentSettings>;
+  /** The one provider every agent with no provider of its own writes with. */
+  defaultProvider: ProviderId | null;
+  providers: Partial<Record<ProviderId, ProviderSettings>>;
   github: { user: string | null };
   bitbucket: { user: string | null };
   jira: { site: string; email: string; account: string | null };
@@ -96,13 +119,11 @@ export interface Detected {
   checkedAt: string | null;
 }
 
-export interface Secrets {
-  anthropic: string | null;
-  openai: string | null;
+export type Secrets = Record<KeyVendor, string | null> & {
   github: string | null;
   bitbucket: string | null;
   jira: string | null;
-}
+};
 
 /** A newer Slipwright Agent, as the window shows it (src/main/updates.ts). */
 export interface UpdateView {
@@ -155,9 +176,34 @@ export interface AgentApi {
   chooseWorkDir(): Promise<string | null>;
   /** This machine's choices as a settings.json for a server (slipwright-agent). */
   exportServerSettings(withSecrets: boolean): Promise<Result>;
+  /** The models a provider offers this machine, with the key typed (not yet saved) or the
+   *  one kept; also the connection test. */
+  listModels(provider: ProviderId, key: string | null, baseUrl: string | null): Promise<ModelList>;
+  saveProvider(provider: ProviderId, patch: Partial<ProviderSettings>): Promise<void>;
+  setDefaultProvider(provider: ProviderId | null): Promise<void>;
+  /** EVREN refuses every call until its terms are accepted, by a person, for the key. */
+  evrenTerms(): Promise<EvrenTerms>;
+  acceptEvrenTerms(version: number): Promise<EvrenTerms>;
   checkForUpdates(): Promise<void>;
   /** Downloads the newer version, or opens its release page where it cannot install itself. */
   downloadUpdate(): Promise<void>;
   /** Quits and restarts into the downloaded version. */
   installUpdate(): Promise<void>;
+}
+
+export interface ModelList {
+  ok: boolean;
+  models: string[];
+  /** What went wrong, or how many were found, in the person's words. */
+  message: string;
+  /** EVREN said its terms are not accepted for this key. */
+  terms?: boolean;
+}
+
+export interface EvrenTerms {
+  ok: boolean;
+  version: number;
+  accepted: boolean;
+  text: string;
+  message: string;
 }

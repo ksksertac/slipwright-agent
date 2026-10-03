@@ -186,6 +186,48 @@ const tr: Record<string, string> = {
   Light: "Açık",
   Dark: "Koyu",
 
+  // Models: every provider, as on Slipwright's own Models page
+  "Enter a key for each provider you want to use; its models are read from it and you pick one. Every agent writes with the provider marked default, on that provider's default model -- unless it is pinned to a provider of its own below.":
+    "Kullanmak istediğin her sağlayıcı için bir API anahtarı gir; modelleri anahtardan okunur, istediğini seçersin. Her ajan varsayılan işaretli sağlayıcıda, o sağlayıcının varsayılan modeliyle çalışır — aşağıda kendi sağlayıcısına sabitlenmemişse.",
+  "API key": "API anahtarı",
+  "ChatGPT subscription (Codex)": "ChatGPT aboneliği (Codex)",
+  "Base URL (optional)": "Temel URL (isteğe bağlı)",
+  "Default model": "Varsayılan model",
+  "Most output tokens per call": "Çağrı başına en fazla çıktı token'ı",
+  "Get one at": "Buradan al:",
+  "on a server, set": "sunucuda",
+  "kept, ends {hint}": "kayıtlı, sonu {hint}",
+  "Leave empty for {url}; fill it in to go through a proxy.": "{url} için boş bırak; vekil sunucu kullanacaksan doldur.",
+  "With this provider as the default, every agent not pinned to a provider uses this model.":
+    "Bu sağlayıcı varsayılan olunca sağlayıcısı sabitlenmemiş her ajan bunu kullanır.",
+  "{n} (the provider's usual)": "{n} (sağlayıcı varsayılanı)",
+  "How long one answer may be. Raise it if the provider's newer models allow more.":
+    "Bir cevap en fazla ne kadar uzun olabilir. Sağlayıcının yeni modelleri izin veriyorsa yükselt.",
+  "Test connection": "Bağlantıyı sına",
+  "Make default": "Varsayılan yap",
+  Default: "Varsayılan",
+  default: "varsayılan",
+  "Remove key": "Anahtarı kaldır",
+  "Connection works: {n} models": "Bağlantı tamam: {n} model",
+  "Saved.": "Kaydedildi.",
+  "Saved. {n} models listed.": "Kaydedildi. {n} model listelendi.",
+  "key set {hint}": "anahtar ayarlı {hint}",
+  "no key": "anahtar yok",
+  "not signed in": "giriş yapılmadı",
+  "add a key to use it": "kullanmak için anahtar ekle",
+  "choose a default model": "varsayılan model seç",
+  "the CLI's own default": "CLI'ın kendi varsayılanı",
+  "model name": "model adı",
+  "— choose —": "— seç —",
+  Provider: "Sağlayıcı",
+  "Default (none chosen yet)": "Varsayılan (henüz seçilmedi)",
+  "provider default": "sağlayıcının varsayılanı",
+  "provider default · {model}": "sağlayıcının varsayılanı · {model}",
+  "EVREN (SSB) terms of use (v{n}) are accepted for this key.": "EVREN (SSB) kullanım şartları (v{n}) bu anahtar için kabul edildi.",
+  "EVREN refuses every call until its terms of use are accepted for this key. Read them first:":
+    "EVREN, kullanım şartları bu anahtar için kabul edilene kadar her çağrıyı reddeder. Önce oku:",
+  "I have read them and accept (v{n})": "Okudum, kabul ediyorum (v{n})",
+
   // a newer version
   "v{version} is out": "v{version} çıktı",
   "v{version} is ready": "v{version} hazır",

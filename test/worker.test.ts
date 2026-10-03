@@ -77,7 +77,7 @@ function host(client: WorkerClient, done: (e: HistoryEntry) => void): WorkerHost
     holding: () => null,
     maxConcurrent: () => 1,
     workDir: () => dir,
-    model: () => ({ provider: "anthropic", model: "" }),
+    model: () => ({ provider: "anthropic", model: "", baseUrl: null, maxTokens: null }),
     secret: (name) => (name === "anthropic" ? "sk-ant-test" : null),
     bitbucketUser: () => null,
     jira: () => ({ site: "", email: "", account: null }),
