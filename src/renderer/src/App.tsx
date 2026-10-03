@@ -9,6 +9,7 @@ import { t } from "./i18n";
 import logo from "./logo.png";
 import { AgentPage, HistoryPage, JiraPage, ModelsPage, Now, SettingsPage, SourcePage, TeamPage } from "./pages";
 import { AGENT_NAME, agentStatus, Icon, platformsLine } from "./parts";
+import { UpdateBadge, UpdateDialog, useUpdateDialog } from "./update";
 
 // upper-cased in the language's own rules, not CSS's: "İş" must become "İŞ", which
 // text-transform got wrong in Chromium for a dotted capital I
@@ -70,6 +71,8 @@ export function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [page, go] = usePage();
   const now = useNow(5000);
+  const placeholder = { update: { phase: "none" } } as AppState;
+  const dialog = useUpdateDialog(state ?? placeholder);
 
   useEffect(() => {
     void window.agent.state().then(setState);
@@ -106,6 +109,7 @@ export function App() {
           <div>
             <b>Slipwright Agent</b>
             <span>v{state.version}</span>
+            <UpdateBadge state={state} show={dialog.show} />
           </div>
         </div>
         <ConnectionCard state={state} go={go} />
@@ -159,6 +163,7 @@ export function App() {
         </div>
       </aside>
       <main>{body}</main>
+      {dialog.open && <UpdateDialog state={state} hide={dialog.hide} />}
     </div>
   );
 }

@@ -104,8 +104,22 @@ export interface Secrets {
   jira: string | null;
 }
 
+/** A newer Slipwright Agent, as the window shows it (src/main/updates.ts). */
+export interface UpdateView {
+  phase: "none" | "available" | "downloading" | "ready" | "error";
+  /** The newer version, without its "v". */
+  version: string | null;
+  /** Its release notes, as plain text. */
+  notes: string | null;
+  percent: number;
+  error: string | null;
+  /** Whether this copy installs it itself; a Mac or a .deb is sent to the release page. */
+  self: boolean;
+}
+
 export interface AppState {
   version: string;
+  update: UpdateView;
   machineName: string;
   pairing: Pairing | null;
   connection: Connection;
@@ -141,4 +155,9 @@ export interface AgentApi {
   chooseWorkDir(): Promise<string | null>;
   /** This machine's choices as a settings.json for a server (slipwright-agent). */
   exportServerSettings(withSecrets: boolean): Promise<Result>;
+  checkForUpdates(): Promise<void>;
+  /** Downloads the newer version, or opens its release page where it cannot install itself. */
+  downloadUpdate(): Promise<void>;
+  /** Quits and restarts into the downloaded version. */
+  installUpdate(): Promise<void>;
 }

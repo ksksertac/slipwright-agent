@@ -23,6 +23,9 @@ const api: AgentApi = {
   detect: () => ipcRenderer.invoke("detect"),
   chooseWorkDir: () => ipcRenderer.invoke("chooseWorkDir"),
   exportServerSettings: (withSecrets) => ipcRenderer.invoke("exportServerSettings", withSecrets),
+  checkForUpdates: () => ipcRenderer.invoke("checkForUpdates"),
+  downloadUpdate: () => ipcRenderer.invoke("downloadUpdate"),
+  installUpdate: () => ipcRenderer.invoke("installUpdate"),
 };
 
 contextBridge.exposeInMainWorld("agent", api);

@@ -21,7 +21,7 @@ import {
   shell,
   Tray,
 } from "electron";
-import type { AgentId, AgentSettings, AppState, Connection, Detected, HistoryEntry, Result, Secrets, Settings } from "@shared/types";
+import type { AgentId, AgentSettings, AppState, Connection, Detected, HistoryEntry, Result, Secrets, Settings, UpdateView } from "@shared/types";
 import { AGENTS } from "@shared/types";
 import { fromApp } from "../cli/settings";
 import { capabilities as deriveCapabilities } from "./capabilities";
@@ -35,7 +35,7 @@ import { adoptShellPath } from "./proc";
 import { hint, Store, type SecretName } from "./store";
 import { DirectTransport, RelayTransport, type Transport } from "./transport";
 import { Worker } from "./worker";
-import { watchForUpdates } from "./updates";
+import { checkForUpdates, downloadUpdate, installUpdate, updateView, watchForUpdates } from "./updates";
 
 const argv = process.argv.slice(1);
 const flag = (name: string): string | null => {
@@ -50,6 +50,8 @@ const SCREENSHOT_PAGE = flag("--page");
 // `--demo`: a made-up pairing and two running phases, for screenshots of a busy machine.
 // It never talks to a server.
 const DEMO = argv.includes("--demo");
+// `--update <phase>`: the newer-version dialog in that phase, for its screenshots
+const DEMO_UPDATE = flag("--update") as UpdateView["phase"] | null;
 const HIDDEN = argv.includes("--hidden");
 
 if (SCREENSHOT) app.setPath("userData", join(app.getPath("temp"), "slipwright-agent-screenshot"));
@@ -92,6 +94,7 @@ function secretsView(): Secrets {
 function state(): AppState {
   const base: AppState = {
     version: app.getVersion(),
+    update: DEMO_UPDATE ? demoUpdate(DEMO_UPDATE) : updateView(),
     machineName,
     pairing: store.pairing,
     connection: store.pairing ? connection : "unpaired",
@@ -426,6 +429,13 @@ function ipc(): void {
   ipcMain.handle("saveSource", (_e, github: string | null, user: string | null, bitbucket: string | null) => verifySource(github, user, bitbucket));
   ipcMain.handle("saveJira", (_e, site: string, email: string, token: string | null) => verifyJira(site, email, token));
   ipcMain.handle("detect", () => redetect());
+  ipcMain.handle("checkForUpdates", () => checkForUpdates());
+  ipcMain.handle("downloadUpdate", () => downloadUpdate());
+  ipcMain.handle("installUpdate", () => {
+    // the window's close is a hide while not quitting; the installer must find it gone
+    quitting = true;
+    if (!installUpdate()) quitting = false;
+  });
   ipcMain.handle("exportServerSettings", async (_e, withSecrets: boolean): Promise<Result> => {
     const picked = await dialog.showSaveDialog(window!, {
       defaultPath: "settings.json",
@@ -535,11 +545,16 @@ void app.whenReady().then(async () => {
     updateTray(state());
     worker.start();
     setInterval(() => void redetect(), 10 * 60_000);
-    watchForUpdates();
+    watchForUpdates(push);
   }
 });
 
 // -- the demo -------------------------------------------------------------------------
+
+function demoUpdate(phase: UpdateView["phase"]): UpdateView {
+  const notes = "• The relay's box seals in Electron too\n• The window says when a newer version is out";
+  return { phase, version: "1.0.2", notes, percent: 42, error: phase === "error" ? "net::ERR_INTERNET_DISCONNECTED" : null, self: process.platform !== "darwin" };
+}
 
 function demoState(base: AppState): AppState {
   const at = (s: number) => new Date(Date.now() - s * 1000).toISOString();
