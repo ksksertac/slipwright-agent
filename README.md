@@ -199,11 +199,15 @@ itself: the macOS build in particular needs a Mac.
 
 ### Signing
 
-- **macOS.** Gatekeeper refuses an app that is not signed and notarized. Both need an Apple
-  Developer account (paid): set `CSC_LINK` / `CSC_KEY_PASSWORD` to the Developer ID
-  certificate and `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, then turn
-  `notarize` on in `electron-builder.yml`. Unsigned, a person must right-click → Open the
-  first time.
+- **macOS.** The app is ad-hoc signed (`identity: "-"`): one consistent signature, but no
+  Developer ID. A copy downloaded by a browser is quarantined, and Gatekeeper refuses it the
+  first time; once, after installing, run
+  `xattr -cr "/Applications/Slipwright Agent.app"` (or System Settings → Privacy & Security
+  → Open Anyway). Every update after that is downloaded and put in place by the app itself
+  (`src/main/macupdate.ts`), which quarantines nothing, so the warning does not come back.
+  A Developer ID and notarization (paid Apple Developer account: `CSC_LINK` /
+  `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, and
+  `notarize` on) would remove even the first one.
 - **Windows.** An unsigned installer runs, but SmartScreen warns ("Windows protected your
   PC" → More info → Run anyway) until the file has reputation. A code-signing certificate
   (`CSC_LINK`, `CSC_KEY_PASSWORD`) removes the warning; an EV certificate removes it at once.

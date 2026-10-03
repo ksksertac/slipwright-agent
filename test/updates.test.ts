@@ -24,3 +24,17 @@ describe("a newer version", () => {
     expect(plainNotes([{ version: "1.0.2", note: "One fix" }])).toBe("One fix");
   });
 });
+
+describe("a Mac copy replacing itself", async () => {
+  const { runningBundle, zipName } = await import("../src/main/macupdate");
+
+  it("knows its own bundle from the executable's path, and nothing outside one", () => {
+    expect(runningBundle("/Applications/Slipwright Agent.app/Contents/MacOS/Slipwright Agent")).toBe("/Applications/Slipwright Agent.app");
+    expect(runningBundle("/usr/local/bin/node")).toBeNull();
+  });
+
+  it("asks for the zip built for its own processor", () => {
+    expect(zipName("arm64")).toBe("Slipwright-Agent-mac-arm64.zip");
+    expect(zipName("x64")).toBe("Slipwright-Agent-mac-x64.zip");
+  });
+});
