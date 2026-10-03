@@ -74,6 +74,20 @@ itself: the macOS build in particular needs a Mac.
   (`CSC_LINK`, `CSC_KEY_PASSWORD`) removes the warning; an EV certificate removes it at once.
 - **Linux.** Nothing to sign; the AppImage needs `chmod +x`.
 
+## Downloads
+
+Every release of Slipwright carries the app, built by CI on each platform
+(`.github/workflows/docker.yml`, the `desktop` jobs), under names that never change, so
+`https://github.com/ksksertac/slipwright/releases/latest/download/<name>` is always the
+newest:
+
+| | |
+|---|---|
+| Windows | `Slipwright-Agent-Setup.exe` |
+| macOS, Apple Silicon / Intel | `Slipwright-Agent-mac-arm64.dmg` / `Slipwright-Agent-mac-x64.dmg` (and `.zip`) |
+| Linux | `Slipwright-Agent.AppImage`, `slipwright-agent.deb` |
+| A server with no window | `slipwright-agent.cjs` |
+
 ## On a server: slipwright-agent
 
 A server reached over SSH has no window and usually no keyring, so the app's worker also

@@ -1,4 +1,8 @@
 # Packaging for the three platforms. Icons are derived from build/icon.png (512 px).
+#
+# The file names carry no version: a release (.github/workflows/docker.yml) attaches them,
+# and a name that never changes is what lets a link to .../releases/latest/download/<name>
+# always fetch the newest one -- the Machines page links to them that way.
 appId: app.slipwright.agent
 productName: Slipwright Agent
 directories:
@@ -14,16 +18,23 @@ asarUnpack:
 mac:
   category: public.app-category.developer-tools
   target: [dmg, zip]
+  artifactName: Slipwright-Agent-mac-${arch}.${ext}
   hardenedRuntime: true
   # notarization needs an Apple Developer account; see README
   notarize: false
 win:
   target: [nsis]
 nsis:
+  artifactName: Slipwright-Agent-Setup.${ext}
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
 linux:
   target: [AppImage, deb]
   category: Development
-  maintainer: Slipwright
+  # a .deb refuses to be built without an address for its maintainer
+  maintainer: Slipwright <noreply@slipwright.app>
+appImage:
+  artifactName: Slipwright-Agent.${ext}
+deb:
+  artifactName: slipwright-agent.${ext}
