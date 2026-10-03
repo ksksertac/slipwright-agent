@@ -55,7 +55,7 @@ const SCREENSHOT_PAGE = flag("--page");
 // It never talks to a server.
 const DEMO = argv.includes("--demo");
 // `--update <phase>`: the newer-version dialog in that phase, for its screenshots
-const DEMO_UPDATE = flag("--update") as UpdateView["phase"] | null;
+const DEMO_UPDATE = flag("--update") as UpdateView["phase"] | "mac" | null;
 const HIDDEN = argv.includes("--hidden");
 
 if (SCREENSHOT) app.setPath("userData", join(app.getPath("temp"), "slipwright-agent-screenshot"));
@@ -590,9 +590,12 @@ void app.whenReady().then(async () => {
 
 // -- the demo -------------------------------------------------------------------------
 
-function demoUpdate(phase: UpdateView["phase"]): UpdateView {
+/** `--update mac` is a Mac copy that must be installed by hand, on any machine. */
+function demoUpdate(asked: UpdateView["phase"] | "mac"): UpdateView {
   const notes = "• The relay's box seals in Electron too\n• The window says when a newer version is out";
-  return { phase, version: "1.0.2", notes, percent: 42, error: phase === "error" ? "net::ERR_INTERNET_DISCONNECTED" : null, self: process.platform !== "darwin" };
+  const phase = asked === "mac" ? "available" : asked;
+  const mac = asked === "mac" || process.platform === "darwin";
+  return { phase, version: "1.0.2", notes, percent: 42, error: phase === "error" ? "net::ERR_INTERNET_DISCONNECTED" : null, self: !mac, mac };
 }
 
 function demoState(base: AppState): AppState {

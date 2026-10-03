@@ -31,7 +31,7 @@ function howUpdated(): "updater" | "mac" | "page" {
 }
 
 const how = howUpdated();
-let view: UpdateView = { phase: "none", version: null, notes: null, percent: 0, error: null, self: how !== "page" };
+let view: UpdateView = { phase: "none", version: null, notes: null, percent: 0, error: null, self: how !== "page", mac: process.platform === "darwin" };
 // the Mac's: where the newer zip is, and the unpacked bundle waiting for the restart
 let macZip: string | null = null;
 let macFresh: string | null = null;

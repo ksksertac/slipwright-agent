@@ -61,6 +61,28 @@ export function UpdateBadge({ state, show }: { state: AppState; show: () => void
   );
 }
 
+const UNQUARANTINE = 'xattr -cr "/Applications/Slipwright Agent.app"';
+
+function CopyLine({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="cmd">
+      <code>{text}</code>
+      <button
+        className="btn"
+        onClick={() =>
+          void navigator.clipboard.writeText(text).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1800);
+          })
+        }
+      >
+        {copied ? t("Copied") : t("Copy")}
+      </button>
+    </div>
+  );
+}
+
 export function UpdateDialog({ state, hide }: { state: AppState; hide: () => void }) {
   const u = state.update;
   useEffect(() => {
@@ -72,7 +94,24 @@ export function UpdateDialog({ state, hide }: { state: AppState; hide: () => voi
 
   let body: React.ReactNode;
   let action: React.ReactNode;
-  if (!u.self) {
+  if (!u.self && u.mac) {
+    // a .dmg a browser downloads is quarantined, and an app without a Developer ID that is
+    // quarantined is "damaged" to Gatekeeper: the one line that clears it, ready to copy
+    body = (
+      <ol className="steps">
+        <li>{t("Download it and drag Slipwright Agent into Applications, over this one.")}</li>
+        <li>
+          {t("Then paste this into Terminal once -- otherwise macOS says the app is damaged:")}
+          <CopyLine text={UNQUARANTINE} />
+        </li>
+      </ol>
+    );
+    action = (
+      <button className="btn primary" onClick={() => void window.agent.downloadUpdate()}>
+        {t("Open the download page")}
+      </button>
+    );
+  } else if (!u.self) {
     body = <p>{t("This copy cannot replace itself: download it from the release page and install it over this one.")}</p>;
     action = (
       <button className="btn primary" onClick={() => void window.agent.downloadUpdate()}>
